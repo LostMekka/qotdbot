@@ -24,10 +24,6 @@ public class Main {
 			throw new RuntimeException(e);
 		}
 		
-		System.out.println(Constants.TOKEN);
-		
-		System.exit(1);
-		
 		DiscordClient client = DiscordClient.create(Constants.TOKEN);
 		
 		GatewayDiscordClient gateway = client.gateway()
@@ -58,7 +54,6 @@ public class Main {
 			   .subscribe(listener :: onComponent);
 		
 		Scheduler.schedule(QuestionHandler.postNextQuestion(gateway));
-		//		Scheduler.schedule(() -> System.out.println("Scheduler working."));
 		
 		gateway.onDisconnect()
 			   .block();
