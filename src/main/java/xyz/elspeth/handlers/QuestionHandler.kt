@@ -9,9 +9,11 @@ import discord4j.core.`object`.entity.channel.TextChannel
 import discord4j.core.spec.EmbedCreateSpec
 import discord4j.core.spec.MessageCreateSpec
 import discord4j.rest.util.Color
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
-import kotlinx.coroutines.runBlocking
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import storage.Database
@@ -69,7 +71,7 @@ object QuestionHandler {
 
     @JvmStatic
     fun postNextQuestion(client: GatewayDiscordClient) = Runnable {
-        runBlocking {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 logger.info("Posting next question.")
                 val question = Database.getRandomQuestion() ?: throw SQLException("No question found.")
