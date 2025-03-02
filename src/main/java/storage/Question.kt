@@ -1,5 +1,11 @@
-package storage;
+package storage
 
-public record Question(int id, long author, String question) {
+import java.time.Instant
 
-}
+@JvmRecord
+data class Question(
+    val id: Int,
+    val author: Long,
+    val question: String,
+    val approvedAt: Instant,
+)

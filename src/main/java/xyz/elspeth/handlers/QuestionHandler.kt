@@ -1,117 +1,112 @@
-package xyz.elspeth.handlers;
+package xyz.elspeth.handlers
 
-import discord4j.common.util.Snowflake;
-import discord4j.core.GatewayDiscordClient;
-import discord4j.core.object.component.ActionRow;
-import discord4j.core.object.component.Button;
-import discord4j.core.object.entity.User;
-import discord4j.core.object.entity.channel.TextChannel;
-import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.core.spec.MessageCreateSpec;
-import discord4j.rest.util.Color;
-import reactor.core.publisher.Mono;
-import storage.Database;
-import storage.Question;
-import xyz.elspeth.Constants;
-import xyz.elspeth.DiscordIds;
+import discord4j.common.util.Snowflake
+import discord4j.core.GatewayDiscordClient
+import discord4j.core.`object`.component.ActionRow
+import discord4j.core.`object`.component.Button
+import discord4j.core.`object`.entity.Message
+import discord4j.core.`object`.entity.channel.TextChannel
+import discord4j.core.spec.EmbedCreateSpec
+import discord4j.core.spec.MessageCreateSpec
+import discord4j.rest.util.Color
+import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import kotlinx.coroutines.runBlocking
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import storage.Database
+import storage.Question
+import xyz.elspeth.Constants
+import xyz.elspeth.DiscordIds
+import java.sql.SQLException
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
-import java.sql.SQLException;
-import java.util.Objects;
+object QuestionHandler {
+    private val logger: Logger = LoggerFactory.getLogger(QuestionHandler::class.java)
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+    suspend fun createQuestionMessage(client: GatewayDiscordClient, question: Question): MessageCreateSpec {
+        val username = runCatching {
+            client.getUserById(Snowflake.of(question.author))
+                .awaitSingleOrNull()
+                ?.username
+        }.getOrDefault("Missing user")
 
-public class QuestionHandler {
-	
-	private static final Logger logger = LoggerFactory.getLogger(QuestionHandler.class);
-	
-	private static Mono<MessageCreateSpec> createQuestionMessage(GatewayDiscordClient client, Question question) {
-		
-		return client.getUserById(Snowflake.of(question.author()))
-					 .map(User :: getUsername)
-					 .onErrorReturn("Missing user")
-					 .map(username -> {
-						 var embed = EmbedCreateSpec
-							 .builder()
-							 .title("Babas question of the day!")
-							 .description(question.question())
-							 .footer("Author: %s -- %d Cards Remaining".formatted(username, Database.INSTANCE.getQueueLength() - 1), "")
-							 .color(Color.DEEP_LILAC)
-							 .build();
-						 
-						 return MessageCreateSpec
-							 .builder()
-							 .addEmbed(embed)
-							 .addComponent(
-								 ActionRow.of(
-									 Button.secondary(DiscordIds.OPEN_MODAL_BUTTON, "Suggest a question.")
-								 )
-							 )
-							 .build();
-					 });
-	}
-	
-	private static MessageCreateSpec createNoQuestionMessage() {
-		
-		var embed = EmbedCreateSpec
-			.builder()
-			.description("""
-							 This channel has no more cards to post. Please add more cards (or reset decks) if you'd like to continue posting.
-							 
-							 If no cards are available on the next post, the channel will **not** be automatically paused."""
-			)
-			.color(Color.MOON_YELLOW)
-			.build();
-		
-		return MessageCreateSpec
-			.builder()
-			.addEmbed(embed)
-			.addComponent(
-				ActionRow.of(
-					Button.primary(DiscordIds.OPEN_MODAL_BUTTON, "Suggest a question.")
-				)
-			)
-			.build();
-	}
-	
-	public static Runnable postNextQuestion(GatewayDiscordClient client) {
-		
-		return () -> {
-			logger.info("Posting next question.");
-			Mono.justOrEmpty(Database.INSTANCE.getRandomQuestion())
-				.filter(Objects :: nonNull)
-				.switchIfEmpty(Mono.error(new SQLException()))
-				.flatMap(question -> client
-					.getChannelById(Constants.DAILY_CHANNEL)
-					.cast(TextChannel.class)
-					.zipWith(createQuestionMessage(client, question))
-					.flatMap(tuple -> {
-						return tuple.getT1()
-									.createMessage(tuple.getT2());
-					})
-					.map(ignored -> Database.INSTANCE.setQuestionAnswered(question.id()))
-					.filter(value -> value)
-					.switchIfEmpty(Mono.error(new SQLException()))
-					.onErrorResume(error -> {
-						if (!(error instanceof SQLException)) {
-							logger.error("", error);
-						}
-						return client
-							.getChannelById(Constants.MOD_CHANNEL)
-							.cast(TextChannel.class)
-							.flatMap(channel -> channel.createMessage("<@!261538420952662016> Error during question post."))
-							.thenReturn(true);
-					})
-				)
-				.onErrorResume(error -> {
-								   return client.getChannelById(Constants.DAILY_CHANNEL)
-												.cast(TextChannel.class)
-												.flatMap(channel -> channel.createMessage(createNoQuestionMessage()))
-												.then(Mono.empty());
-							   }
-				)
-				.subscribe();
-		};
-	}
-	
+        val cardsRemaining = Database.getQueueLength() - 1
+        val questionAge = ChronoUnit.DAYS.between(question.approvedAt, Instant.now())
+        val embed = EmbedCreateSpec.builder()
+            .title("Babas question of the day!")
+            .description(question.question)
+            .footer("Author: $username -- in pool for $questionAge days -- $cardsRemaining Cards Remaining", "")
+            .color(Color.DEEP_LILAC)
+            .build()
+
+        return MessageCreateSpec.builder()
+            .addEmbed(embed)
+            .addComponent(ActionRow.of(Button.secondary(DiscordIds.OPEN_MODAL_BUTTON, "Suggest a question.")))
+            .build()
+    }
+
+    private fun createNoQuestionMessage(): MessageCreateSpec {
+        val embed: EmbedCreateSpec = EmbedCreateSpec
+            .builder()
+            .description(
+                """
+                This channel has no more cards to post. Please add more cards (or reset decks) if you'd like to continue posting.
+                
+                If no cards are available on the next post, the channel will **not** be automatically paused.
+                """.trimIndent()
+            )
+            .color(Color.MOON_YELLOW)
+            .build()
+
+        return MessageCreateSpec
+            .builder()
+            .addEmbed(embed)
+            .addComponent(ActionRow.of(Button.primary(DiscordIds.OPEN_MODAL_BUTTON, "Suggest a question.")))
+            .build()
+    }
+
+    @JvmStatic
+    fun postNextQuestion(client: GatewayDiscordClient) = Runnable {
+        runBlocking {
+            try {
+                logger.info("Posting next question.")
+                val question = Database.getRandomQuestion() ?: throw SQLException("No question found.")
+
+                client.sendMessage(Constants.DAILY_CHANNEL, createQuestionMessage(client, question))
+
+                val success = Database.setQuestionAnswered(question.id)
+                if (!success) throw SQLException("Failed to mark question as answered.")
+            } catch (e: Exception) {
+                logger.error("Error during question post.", e)
+                runCatching {
+                    client.sendMessage(Constants.MOD_CHANNEL, "<@!261538420952662016> Error during question post.")
+                }
+                // FIXME: better error handling? SQLException can have multiple causes here
+                if (e is SQLException) runCatching {
+                    client.sendMessage(Constants.DAILY_CHANNEL, createNoQuestionMessage())
+                }
+            }
+        }
+    }
+
+    private suspend fun GatewayDiscordClient.sendMessage(
+        channelSnowflake: Snowflake,
+        messageCreateSpec: MessageCreateSpec,
+    ): Message =
+        this.getTextChannel(channelSnowflake)
+            .createMessage(messageCreateSpec)
+            .awaitSingle()
+
+    private suspend fun GatewayDiscordClient.sendMessage(
+        channelSnowflake: Snowflake,
+        plainMessage: String,
+    ): Message =
+        this.getTextChannel(channelSnowflake)
+            .createMessage(plainMessage)
+            .awaitSingle()
+
+    private suspend fun GatewayDiscordClient.getTextChannel(channelSnowflake: Snowflake): TextChannel =
+        getChannelById(channelSnowflake).awaitSingle() as TextChannel
 }
