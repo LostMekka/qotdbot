@@ -74,20 +74,19 @@ object QuestionHandler {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 logger.info("Posting next question.")
-                val question = Database.getRandomQuestion() ?: throw SQLException("No question found.")
+                val question = Database.getRandomQuestion()
+                if (question == null) runCatching {
+                    client.sendMessage(Constants.DAILY_CHANNEL, createNoQuestionMessage())
+                } else {
+                    client.sendMessage(Constants.DAILY_CHANNEL, createQuestionMessage(client, question))
 
-                client.sendMessage(Constants.DAILY_CHANNEL, createQuestionMessage(client, question))
-
-                val success = Database.setQuestionAnswered(question.id)
-                if (!success) throw SQLException("Failed to mark question as answered.")
+                    val success = Database.setQuestionAnswered(question.id)
+                    if (!success) throw SQLException("Failed to mark question as answered.")
+                }
             } catch (e: Exception) {
-                logger.error("Error during question post.", e)
+                if (e !is SQLException) logger.error("Error during question post.", e)
                 runCatching {
                     client.sendMessage(Constants.MOD_CHANNEL, "<@!261538420952662016> Error during question post.")
-                }
-                // FIXME: better error handling? SQLException can have multiple causes here
-                if (e is SQLException) runCatching {
-                    client.sendMessage(Constants.DAILY_CHANNEL, createNoQuestionMessage())
                 }
             }
         }
