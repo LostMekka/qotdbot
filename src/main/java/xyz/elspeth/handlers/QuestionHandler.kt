@@ -37,7 +37,7 @@ object QuestionHandler {
         val embed = EmbedCreateSpec.builder()
             .title("Babas question of the day!")
             .description(question.question)
-            .footer("Author: $username -- in pool for $questionAge days -- $cardsRemaining Cards Remaining", "")
+            .footer("Author: $username -- added $questionAge days ago -- $cardsRemaining Cards Remaining", "")
             .color(Color.DEEP_LILAC)
             .build()
 
