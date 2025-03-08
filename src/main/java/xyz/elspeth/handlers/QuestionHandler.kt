@@ -9,9 +9,6 @@ import discord4j.core.`object`.entity.channel.TextChannel
 import discord4j.core.spec.EmbedCreateSpec
 import discord4j.core.spec.MessageCreateSpec
 import discord4j.rest.util.Color
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.slf4j.Logger
@@ -70,24 +67,22 @@ object QuestionHandler {
     }
 
     @JvmStatic
-    fun postNextQuestion(client: GatewayDiscordClient) = Runnable {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                logger.info("Posting next question.")
-                val question = Database.getRandomQuestion()
-                if (question == null) runCatching {
-                    client.sendMessage(Constants.DAILY_CHANNEL, createNoQuestionMessage())
-                } else {
-                    client.sendMessage(Constants.DAILY_CHANNEL, createQuestionMessage(client, question))
+    fun postNextQuestion(client: GatewayDiscordClient): suspend () -> Unit = {
+        try {
+            logger.info("Posting next question.")
+            val question = Database.getRandomQuestion()
+            if (question == null) runCatching {
+                client.sendMessage(Constants.DAILY_CHANNEL, createNoQuestionMessage())
+            } else {
+                client.sendMessage(Constants.DAILY_CHANNEL, createQuestionMessage(client, question))
 
-                    val success = Database.setQuestionAnswered(question.id)
-                    if (!success) throw SQLException("Failed to mark question as answered.")
-                }
-            } catch (e: Exception) {
-                if (e !is SQLException) logger.error("Error during question post.", e)
-                runCatching {
-                    client.sendMessage(Constants.MOD_CHANNEL, "<@!261538420952662016> Error during question post.")
-                }
+                val success = Database.setQuestionAnswered(question.id)
+                if (!success) throw SQLException("Failed to mark question as answered.")
+            }
+        } catch (e: Exception) {
+            if (e !is SQLException) logger.error("Error during question post.", e)
+            runCatching {
+                client.sendMessage(Constants.MOD_CHANNEL, "<@!261538420952662016> Error during question post.")
             }
         }
     }

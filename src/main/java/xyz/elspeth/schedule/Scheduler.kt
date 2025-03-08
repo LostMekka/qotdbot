@@ -1,41 +1,43 @@
-package xyz.elspeth.schedule;
+package xyz.elspeth.schedule
 
-import java.time.Duration;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.time.Duration
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.Executors
+import kotlin.time.toKotlinDuration
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+object Scheduler {
+    private val logger: Logger = LoggerFactory.getLogger(Scheduler::class.java)
+    private val scope = Executors
+        // daemon threads get killed when main() exits and there are no non-daemon threads left
+        .newSingleThreadExecutor { Thread(it, "scheduler-thread").apply { isDaemon = true } }
+        .asCoroutineDispatcher()
+        .let { CoroutineScope(it) }
 
-public class Scheduler {
-	
-	private static final Logger logger = LoggerFactory.getLogger(Scheduler.class);
-	
-	public static void schedule(Runnable runnable) {
-		
-		ZonedDateTime now = ZonedDateTime.now(ZoneId.of("UTC"));
-		ZonedDateTime nextRun = now.withHour(0)
-								   .withMinute(0)
-								   .withSecond(0);
-		if (now.compareTo(nextRun) > 0) {
-			nextRun = nextRun.plusDays(1);
-		}
-		
-		Duration duration     = Duration.between(now, nextRun);
-		long     initialDelay = duration.getSeconds();
-		
-		//noinspection resource
-		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-		scheduler.scheduleAtFixedRate(
-			runnable,
-			initialDelay,
-			TimeUnit.DAYS.toSeconds(1),
-			TimeUnit.SECONDS
-		);
-		logger.info("Started logger. Next run: {}", duration);
-	}
-	
+    @JvmStatic
+    fun schedule(job: suspend () -> Unit) {
+        var nextRun = now.truncatedTo(ChronoUnit.DAYS).plusDays(1)
+
+        scope.launch {
+            while (isActive) {
+                val delay = timeUntil(nextRun)
+                if (delay.isPositive()) delay(delay)
+                nextRun = nextRun.plusDays(1)
+                job()
+            }
+        }
+
+        logger.info("Started schedule. Next run in: {}", timeUntil(nextRun))
+    }
+
+    private fun timeUntil(nextRun: ZonedDateTime?) = Duration.between(now, nextRun).toKotlinDuration()
+    private val now: ZonedDateTime get() = ZonedDateTime.now(ZoneId.of("UTC"))
 }
