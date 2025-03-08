@@ -71,7 +71,7 @@ object QuestionHandler {
         try {
             logger.info("Posting next question.")
             val question = Database.getRandomQuestion()
-            if (question == null) runCatching {
+            if (question == null) {
                 client.sendMessage(Constants.DAILY_CHANNEL, createNoQuestionMessage())
             } else {
                 client.sendMessage(Constants.DAILY_CHANNEL, createQuestionMessage(client, question))
@@ -80,7 +80,7 @@ object QuestionHandler {
                 if (!success) throw SQLException("Failed to mark question as answered.")
             }
         } catch (e: Exception) {
-            if (e !is SQLException) logger.error("Error during question post.", e)
+            logger.error("Error during question post.", e)
             runCatching {
                 client.sendMessage(Constants.MOD_CHANNEL, "<@!261538420952662016> Error during question post.")
             }
