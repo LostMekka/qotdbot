@@ -107,7 +107,8 @@ object Database {
     fun getRandomQuestion(): Question? {
         return try {
             postgres.connection.use { connection ->
-                val statement = connection.prepareStatement("SELECT * FROM public.questions WHERE answered = false ORDER BY random() LIMIT 1")
+                val statement =
+                    connection.prepareStatement("SELECT * FROM public.questions WHERE answered = false ORDER BY random() LIMIT 1")
                 val result = statement.executeQuery()
 
                 if (!result.next()) {
@@ -118,7 +119,7 @@ object Database {
                     id = result.getInt("id"),
                     author = result.getLong("author"),
                     question = result.getString("question"),
-                    approvedAt = result.getTimestamp("approvedAt").toInstant(),
+                    approvedAt = result.getTimestamp("approved_at").toInstant(),
                 )
             }
         } catch (_: SQLException) {

@@ -15,8 +15,9 @@ public class ModalHandler {
 			.customId(DiscordIds.MODAL)
 			.addComponent(
 				ActionRow.of(
-					TextInput.paragraph("question", "Question", 0, 255)
-							 .required()
+					TextInput
+						.paragraph(DiscordIds.QUESTION_AREA, "Question", 0, 255)
+						.required()
 				)
 			)
 			.build();

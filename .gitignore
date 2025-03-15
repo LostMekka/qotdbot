@@ -2,3 +2,5 @@
 .gradle/
 build/
 docker-compose.yaml
+.kotlin/
+config.properties
