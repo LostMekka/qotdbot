@@ -1,6 +1,6 @@
 plugins {
     id 'com.github.johnrengelman.shadow' version '7.1.2'
-    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '2.1.0'
 }
 
 group = 'xyz.elspeth'
@@ -13,9 +13,15 @@ repositories {
 dependencies {
     implementation 'com.discord4j:discord4j-core:3.2.7'
     implementation 'com.zaxxer:HikariCP:6.2.1'
-    runtimeOnly 'org.postgresql:postgresql:42.6.0'
+    runtimeOnly 'org.postgresql:postgresql:42.7.5'
     runtimeOnly 'org.slf4j:slf4j-jdk14:2.0.16'
     compileOnly 'org.jetbrains:annotations:24.0.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.1'
+}
+
+kotlin {
+    jvmToolchain(21)
 }
 
 jar {
